@@ -1,0 +1,72 @@
+name: Daily Podcast Generation
+
+on:
+  schedule:
+    - cron: '0 21 * * *'   # UTC 21:00 = JST 6:00
+  workflow_dispatch:
+    inputs:
+      date_override:
+        description: '実行日付の上書き（任意の日付文字列、例: 2026-05-22）'
+        required: false
+        default: ''
+
+permissions:
+  contents: write
+
+jobs:
+  generate-podcast:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: リポジトリをチェックアウト
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Python のセットアップ
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: FFmpeg のインストール
+        run: |
+          echo "FFmpeg をインストール中..."
+          sudo apt-get update -qq
+          sudo apt-get install -y ffmpeg
+          ffmpeg -version | head -1
+
+      - name: Python パッケージのインストール
+        run: |
+          echo "依存パッケージをインストール中..."
+          pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: ポッドキャスト生成
+        env:
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          GOOGLE_CLIENT_ID: ${{ secrets.GOOGLE_CLIENT_ID }}
+          GOOGLE_CLIENT_SECRET: ${{ secrets.GOOGLE_CLIENT_SECRET }}
+          GOOGLE_REFRESH_TOKEN: ${{ secrets.GOOGLE_REFRESH_TOKEN }}
+          DATE_OVERRIDE: ${{ github.event.inputs.date_override }}
+        run: |
+          echo "ポッドキャスト生成を開始..."
+          python main.py
+
+      - name: 途中成果物を git にコミット
+        if: always()
+        run: |
+          git config user.email "actions@github.com"
+          git config user.name "GitHub Actions"
+
+          # JSON ファイルと設定ファイルをステージング（音声ファイルは .gitignore で除外）
+          git add output/ || true
+
+          # 変更がある場合のみコミット
+          if git diff --staged --quiet; then
+            echo "コミットする変更はありません"
+          else
+            COMMIT_DATE=$(date -u +"%Y-%m-%d %H:%M UTC")
+            git commit -m "chore: podcast results ${COMMIT_DATE}"
+            git push
+            echo "途中成果物をコミットしました"
+          fi

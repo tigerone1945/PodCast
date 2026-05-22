@@ -1,0 +1,25 @@
+# 音声ファイル（容量大・再生成可能）
+output/*.wav
+output/*.mp3
+output/chunk_*.wav
+
+# Claude Code 設定
+.claude/
+
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+.env
+*.egg-info/
+dist/
+build/
+.venv/
+venv/
+
+# macOS
+.DS_Store
+
+# IDE
+.idea/
+.vscode/
